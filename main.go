@@ -130,7 +130,7 @@ func main() {
 	m := model{
 		choices:     []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
 		selected:    make(map[int]struct{}),
-		spinner:     spinner.New(),
+		spinner:     spinner.New(spinner.WithSpinner(spinner.Dot)),
 		isDataReady: false,
 	}
 
