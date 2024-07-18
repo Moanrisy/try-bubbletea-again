@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -11,15 +13,39 @@ type model struct {
 	choices  []string         // items on the to-do list
 	cursor   int              // which to-do list item our cursor is pointing at
 	selected map[int]struct{} // which to-do items are selected
+	// spinner
+	spinner     spinner.Model
+	isDataReady bool
+}
+
+func loadingData() tea.Cmd {
+	return func() tea.Msg {
+		ch := make(chan tea.Msg)
+		go func() tea.Msg {
+			time.Sleep(time.Second * 1)
+			// return tea.Msg("data-is-ready")
+			ch <- tea.Msg("data-is-ready")
+			return <-ch
+		}()
+		return <-ch
+	}
 }
 
 // Init implements tea.Model.
 func (m model) Init() tea.Cmd {
-	return nil
+	// Imagine there is an API call or database call that take some seconds
+	// return a tea.Msg to let Update function know that the data is ready
+	// and the spinner should be removed
+	return tea.Batch(m.spinner.Tick, loadingData())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case string:
+		if msg == "data-is-ready" {
+			m.isDataReady = true
+		}
+
 	// Is it a key press?
 	case tea.KeyMsg:
 
@@ -51,6 +77,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.selected[m.cursor] = struct{}{}
 			}
+
+		default:
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
 		}
 	}
 
@@ -60,6 +91,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	if !m.isDataReady {
+		// Loading spinner
+		l := fmt.Sprintf("\n\n   %s Loading forever...\n\n", m.spinner.View())
+		return l
+	}
+
 	// The header
 	s := "What should we buy at the market?\n\n"
 
@@ -91,8 +128,10 @@ func (m model) View() string {
 
 func main() {
 	m := model{
-		choices:  []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
-		selected: make(map[int]struct{}),
+		choices:     []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
+		selected:    make(map[int]struct{}),
+		spinner:     spinner.New(),
+		isDataReady: false,
 	}
 
 	p := tea.NewProgram(m)
